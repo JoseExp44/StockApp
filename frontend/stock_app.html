@@ -1,0 +1,104 @@
+<html>
+<head>
+  <title>Stock Data Analysis Table</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    .stat-btn { margin: 0 4px 0 0; }
+    #stat-table { margin-top: 15px; }
+    #stat-table th, #stat-table td { padding: 5px 12px; }
+  </style>
+</head>
+<body>
+  <h2>Stock Data Analysis Table</h2>
+
+  <div>
+    <label for="start-date">From:</label>
+    <input type="date" id="start-date" />
+
+    <label for="end-date">To:</label>
+    <input type="date" id="end-date" />
+  </div>
+
+  <div style="margin-top: 10px;">
+    <label>Show statistic:</label>
+    <button class="stat-btn" onclick="fetchStat('mean')">Mean</button>
+    <button class="stat-btn" onclick="fetchStat('median')">Median</button>
+    <button class="stat-btn" onclick="fetchStat('std')">Std Dev</button>
+    <button class="stat-btn" onclick="fetchStat('max')">Max</button>
+    <button class="stat-btn" onclick="fetchStat('min')">Min</button>
+  </div>
+
+  <table id="stat-table" border="1" style="display:none;">
+    <thead>
+      <tr>
+        <th>Ticker</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let minDate, maxDate;
+
+    // Called by backend to initialize UI with valid date range
+    window.initApp = function(minD, maxD) {
+        // Set global variables
+        minDate = minD;
+        maxDate = maxD;
+        
+        // Set value and min/max for both date pickers to limit selection range
+        // Only limits the UI, manual input requires further validation
+        let startInput = document.getElementById('start-date');
+        let endInput = document.getElementById('end-date');
+        startInput.value = minDate;
+        startInput.min = minDate;
+        startInput.max = maxDate;
+        endInput.value = maxDate;
+        endInput.min = minDate;
+        endInput.max = maxDate;
+    };
+
+    function fetchStat(stat) {
+        // Date validation
+        let start = new Date(document.getElementById('start-date').value);
+        let end = new Date(document.getElementById('end-date').value);
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            alert("One or both dates are invalid. Please enter valid calendar dates");
+            return;
+        }
+        
+        if (start > end) {
+            alert("Start date cannot be after end date.");
+            return;
+        }
+        
+        if (start < new Date(minDate) || end > new Date(maxDate)) {
+            alert(`Dates must be between ${minDate} and ${maxDate}.`);
+            return;
+        }
+        
+        // All checks passed—send to backend
+        call_py('get_stats', stat, start.toISOString().slice(0,10), end.toISOString().slice(0,10));
+    }
+    
+    window.showStatResults = function(stat, results) {
+        let table = document.getElementById('stat-table');
+        let tbody = table.querySelector('tbody');
+        tbody.innerHTML = '';
+        
+        for (let ticker in results) {
+          let val = results[ticker];
+          let display;
+          if (val == null || isNaN(Number(val))) {
+            display = "N/A";
+          } else {
+            display = Number(val).toFixed(3);
+          }
+          tbody.innerHTML += `<tr><td>${ticker}</td><td>${display}</td></tr>`;
+        }
+        table.style.display = '';
+    };
+  </script>
+</body>
+</html>
