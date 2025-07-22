@@ -12,7 +12,9 @@ def main():
 
     # Register handlers
     PyLinkJS.ready = handlers.ready        
-    PyLinkJS.get_stats = handlers.get_stats
+    PyLinkJS.get_plot_data = handlers.get_plot_data
+    PyLinkJS.get_stat_value = handlers.get_stat_value
+    
 
     print(f"Starting web server on port {SERVER_PORT}...")
     PyLinkJS.run_pylinkjs_app(

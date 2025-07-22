@@ -1,103 +1,255 @@
+<!DOCTYPE html>
 <html>
 <head>
-  <title>Stock Data Analysis Table</title>
+  <title>Stock Data Line Plot</title>
   <style>
     body { font-family: sans-serif; margin: 20px; }
-    .stat-btn { margin: 0 4px 0 0; }
-    #stat-table { margin-top: 15px; }
-    #stat-table th, #stat-table td { padding: 5px 12px; }
+    #plot-container { margin-top: 25px; width: 700px; }
+    .stat-btn {
+      margin: 8px 4px 0 0;
+      padding: 5px 10px;
+      border: 1px solid #888;
+      border-radius: 4px;
+      background: #f6f6f6;
+      cursor: pointer;
+    }
+    .stat-btn.active {
+      background: #a1caf1;
+      color: #001833;
+      border: 1.5px solid #285cc4;
+    }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <h2>Stock Data Analysis Table</h2>
-
+  <h2>Stock Data Line Plot</h2>
   <div>
+    <label for="ticker-select">Ticker:</label>
+    <select id="ticker-select"></select>
     <label for="start-date">From:</label>
     <input type="date" id="start-date" />
-
     <label for="end-date">To:</label>
     <input type="date" id="end-date" />
+    <!-- Plot button removed: chart updates instantly on input change -->
   </div>
-
-  <div style="margin-top: 10px;">
+  <div id="plot-container">
+    <canvas id="stock-chart" width="680" height="350"></canvas>
+    <div id="plot-error" style="color:red;"></div>
+  </div>
+  <div style="margin-top: 14px;">
     <label>Show statistic:</label>
-    <button class="stat-btn" onclick="fetchStat('mean')">Mean</button>
-    <button class="stat-btn" onclick="fetchStat('median')">Median</button>
-    <button class="stat-btn" onclick="fetchStat('std')">Std Dev</button>
-    <button class="stat-btn" onclick="fetchStat('max')">Max</button>
-    <button class="stat-btn" onclick="fetchStat('min')">Min</button>
+    <button class="stat-btn" id="mean-btn" onclick="toggleStatLine('mean')">Mean</button>
+    <button class="stat-btn" id="median-btn" onclick="toggleStatLine('median')">Median</button>
+    <button class="stat-btn" id="std-btn" onclick="toggleStatLine('std')">Std Dev</button>
   </div>
-
-  <table id="stat-table" border="1" style="display:none;">
-    <thead>
-      <tr>
-        <th>Ticker</th>
-        <th>Value</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
   <script>
-    let minDate, maxDate;
+    let tickers = [], minDate, maxDate, chart = null;
+    let plotX = [], plotY = [];
+    let activeStats = {mean: false, median: false, std: false};
 
-    // Called by backend to initialize UI with valid date range
-    window.initApp = function(minD, maxD) {
-        // Set global variables
-        minDate = minD;
-        maxDate = maxD;
-        
-        // Set value and min/max for both date pickers to limit selection range
-        // Only limits the UI, manual input requires further validation
-        let startInput = document.getElementById('start-date');
-        let endInput = document.getElementById('end-date');
-        startInput.value = minDate;
-        startInput.min = minDate;
-        startInput.max = maxDate;
-        endInput.value = maxDate;
-        endInput.min = minDate;
-        endInput.max = maxDate;
+    // initApp now takes defaultStart and defaultEnd for picker values
+    window.initApp = function(tickerList, minD, maxD, defaultStart, defaultEnd) {
+      tickers = tickerList;
+      minDate = minD;
+      maxDate = maxD;
+      let sel = document.getElementById('ticker-select');
+      sel.innerHTML = tickers.map(t => `<option value="${t}">${t}</option>`).join('');
+      let startInput = document.getElementById('start-date');
+      let endInput = document.getElementById('end-date');
+      // Use defaultStart and defaultEnd for picker values, minD/maxD for limits
+      startInput.value = defaultStart;
+      startInput.min = minDate;
+      startInput.max = maxDate;
+      endInput.value = defaultEnd;
+      endInput.min = minDate;
+      endInput.max = maxDate;
+
+      // Auto-update on any change (NEW!)
+      sel.onchange = fetchPlotData;
+      startInput.onchange = fetchPlotData;
+      endInput.onchange = fetchPlotData;
+
+      fetchPlotData();
     };
 
-    function fetchStat(stat) {
-        // Date validation
-        let start = new Date(document.getElementById('start-date').value);
-        let end = new Date(document.getElementById('end-date').value);
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-            alert("One or both dates are invalid. Please enter valid calendar dates");
-            return;
-        }
-        
-        if (start > end) {
-            alert("Start date cannot be after end date.");
-            return;
-        }
-        
-        if (start < new Date(minDate) || end > new Date(maxDate)) {
-            alert(`Dates must be between ${minDate} and ${maxDate}.`);
-            return;
-        }
-        
-        // All checks passed—send to backend
-        call_py('get_stats', stat, start.toISOString().slice(0,10), end.toISOString().slice(0,10));
+    function fetchPlotData() {
+      let ticker = document.getElementById('ticker-select').value;
+      let startVal = document.getElementById('start-date').value;
+      let endVal = document.getElementById('end-date').value;
+      let start = new Date(startVal), end = new Date(endVal);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        alert("Invalid dates selected."); return;
+      }
+      if (start > end) {
+        alert("Start date cannot be after end date."); return;
+      }
+      if (start < new Date(minDate) || end > new Date(maxDate)) {
+        alert(`Dates must be between ${minDate} and ${maxDate}.`); return;
+      }
+      // Reset all stat buttons and active stats when the main data changes
+      activeStats = {mean: false, median: false, std: false};
+      ["mean", "median", "std"].forEach(s => {
+        document.getElementById(s + "-btn").classList.remove("active");
+      });
+      call_py('get_plot_data', ticker, startVal, endVal);
     }
-    
-    window.showStatResults = function(stat, results) {
-        let table = document.getElementById('stat-table');
-        let tbody = table.querySelector('tbody');
-        tbody.innerHTML = '';
-        
-        for (let ticker in results) {
-          let val = results[ticker];
-          let display;
-          if (val == null || isNaN(Number(val))) {
-            display = "N/A";
-          } else {
-            display = Number(val).toFixed(3);
+
+    window.plotStockData = function(x, y, errorMsg) {
+      let errorDiv = document.getElementById('plot-error');
+      if (errorMsg) {
+        errorDiv.textContent = errorMsg;
+        if (chart) { chart.destroy(); chart = null; }
+        plotX = []; plotY = [];
+        return;
+      }
+      errorDiv.textContent = "";
+      plotX = x;
+      plotY = y;
+      let ctx = document.getElementById('stock-chart').getContext('2d');
+      if (chart) { chart.destroy(); }
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: x,
+          datasets: [{
+            label: "Close Price ($)",
+            data: y,
+            borderColor: "blue",
+            fill: false,
+            pointRadius: 1.5,
+            hidden: false
+          }]
+        },
+        options: {
+          responsive: false,
+          plugins: {
+            legend: {
+              onClick: (e) => {} // disables toggling main line
+            }
+          },
+          scales: {
+            x: {
+              type: 'category',
+              title: { display: true, text: 'Date' },
+              ticks: {
+                autoSkip: true,
+                maxTicksLimit: 12
+              }
+            },
+            y: {
+              title: { display: true, text: 'Price ($)' },
+              ticks: { stepSize: 10 },
+              beginAtZero: false
+            }
           }
-          tbody.innerHTML += `<tr><td>${ticker}</td><td>${display}</td></tr>`;
         }
-        table.style.display = '';
+      });
+    };
+
+    // Helper: find dataset index by label
+    function getStatDatasetIndex(label) {
+      if (!chart) return -1;
+      return chart.data.datasets.findIndex(ds => ds.label === label);
+    }
+
+    function toggleStatLine(stat) {
+      activeStats[stat] = !activeStats[stat];
+      document.getElementById(stat + "-btn").classList.toggle("active", activeStats[stat]);
+
+      let ticker = document.getElementById('ticker-select').value;
+      let startVal = document.getElementById('start-date').value;
+      let endVal = document.getElementById('end-date').value;
+
+      if (activeStats[stat]) {
+        // Add stat line(s)
+        call_py('get_stat_value', ticker, startVal, endVal, stat);
+      } else {
+        // Remove stat line(s) only for this stat
+        if (!chart) return;
+        if (stat === "mean") {
+          let idx = getStatDatasetIndex("Mean");
+          if (idx > -1) chart.data.datasets.splice(idx, 1);
+        }
+        if (stat === "median") {
+          let idx = getStatDatasetIndex("Median");
+          if (idx > -1) chart.data.datasets.splice(idx, 1);
+        }
+        if (stat === "std") {
+          // Remove both std lines if present
+          let idx1 = getStatDatasetIndex("Mean + Std Dev");
+          if (idx1 > -1) chart.data.datasets.splice(idx1, 1);
+          let idx2 = getStatDatasetIndex("Mean - Std Dev");
+          if (idx2 > -1) chart.data.datasets.splice(idx2, 1);
+        }
+        chart.update();
+      }
+    }
+
+    window.drawStatLine = function(stat, value, upper, lower) {
+      if (!chart) return;
+      // Remove only the dataset(s) for the given stat, if they already exist (avoid duplicate lines)
+      if (stat === "mean") {
+        let idx = getStatDatasetIndex("Mean");
+        if (idx > -1) chart.data.datasets.splice(idx, 1);
+        // Add new
+        let statDataset = {
+          label: "Mean",
+          data: plotX.map(_ => value),
+          borderColor: "green",
+          borderWidth: 2,
+          fill: false,
+          borderDash: [7, 5],
+          pointRadius: 0,
+          spanGaps: true
+        };
+        chart.data.datasets.push(statDataset);
+      }
+      if (stat === "median") {
+        let idx = getStatDatasetIndex("Median");
+        if (idx > -1) chart.data.datasets.splice(idx, 1);
+        // Add new
+        let statDataset = {
+          label: "Median",
+          data: plotX.map(_ => value),
+          borderColor: "purple",
+          borderWidth: 2,
+          fill: false,
+          borderDash: [7, 5],
+          pointRadius: 0,
+          spanGaps: true
+        };
+        chart.data.datasets.push(statDataset);
+      }
+      if (stat === "std") {
+        // Remove both std lines if present
+        let idx1 = getStatDatasetIndex("Mean + Std Dev");
+        if (idx1 > -1) chart.data.datasets.splice(idx1, 1);
+        let idx2 = getStatDatasetIndex("Mean - Std Dev");
+        if (idx2 > -1) chart.data.datasets.splice(idx2, 1);
+        // Add both std lines
+        let upperDataset = {
+          label: "Mean + Std Dev",
+          data: plotX.map(_ => upper),
+          borderColor: "orange",
+          borderWidth: 2,
+          fill: false,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          spanGaps: true
+        };
+        let lowerDataset = {
+          label: "Mean - Std Dev",
+          data: plotX.map(_ => lower),
+          borderColor: "red",
+          borderWidth: 2,
+          fill: false,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          spanGaps: true
+        };
+        chart.data.datasets.push(upperDataset, lowerDataset);
+      }
+      chart.update();
     };
   </script>
 </body>
