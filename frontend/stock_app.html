@@ -174,7 +174,7 @@
           let idx = getStatDatasetIndex("Median");
           if (idx > -1) chart.data.datasets.splice(idx, 1);
         }
-        if (stat === "std" && upper != null && lower != null && !isNaN(upper) && !isNaN(lower)) {
+        if (stat === "std")) {
           // Remove both std lines if present
           let idx1 = getStatDatasetIndex("Mean + Std Dev");
           if (idx1 > -1) chart.data.datasets.splice(idx1, 1);
@@ -220,7 +220,7 @@
         };
         chart.data.datasets.push(statDataset);
       }
-      if (stat === "std") {
+      if (stat === "std" && upper != null && lower != null && !isNaN(upper) && !isNaN(lower)) {
         // Remove both std lines if present
         let idx1 = getStatDatasetIndex("Mean + Std Dev");
         if (idx1 > -1) chart.data.datasets.splice(idx1, 1);
