@@ -85,10 +85,11 @@ def get_stat_value(jsc, ticker, start, end, stat):
     if not pd.isna(mean) and not pd.isna(std):
         upper = mean + std
         lower = mean - std
-        jsc.eval_js_code(
-            f"window.drawStatLine('std', {mean}, {upper}, {lower});"
-        )
     else:
-        jsc.eval_js_code(
-            "window.drawStatLine('std', null, null, null);"
-        )
+        upper = lower = None
+    jsc.eval_js_code(
+        f"window.drawStatLine('std', "
+        f"{mean if mean is not None else 'null'}, "
+        f"{upper if upper is not None else 'null'}, "
+        f"{lower if lower is not None else 'null'});"
+    )
