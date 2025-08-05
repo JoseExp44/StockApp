@@ -80,15 +80,15 @@ def get_stat_value(jsc, ticker, start, end, stat):
         median = float(median) if not pd.isna(median) else None
         jsc.eval_js_code(f"window.drawStatLine('median', {median}, null, null);")
     elif stat == "std":
-    if len(price) > 1:
-        mean = price.mean()
-        std = price.std()
-        upper = mean + std
-        lower = mean - std
-        jsc.eval_js_code(
-            f"window.drawStatLine('std', {mean}, {upper}, {lower});"
-        )
-    else:
-        jsc.eval_js_code(
-            "window.drawStatLine('std', null, null, null);"
-        )
+        if len(price) > 1:
+            mean = price.mean()
+            std = price.std()
+            upper = mean + std
+            lower = mean - std
+            jsc.eval_js_code(
+                f"window.drawStatLine('std', {mean}, {upper}, {lower});"
+            )
+        else:
+            jsc.eval_js_code(
+                "window.drawStatLine('std', null, null, null);"
+            )
