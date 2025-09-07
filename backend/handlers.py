@@ -1,20 +1,18 @@
 """
-PyLinkJS handlers: connect frontend requests to backend logic.
+Frontend data event handlers: backend processes request and frontend displays.
+Uses PyLinkJS jsc.eval_js_code() to act as bridge between frontend/backend.
 
-Flow:
-  - ready: Called when the page loads. Computes defaults and calls JS initApp.
-  - get_plot_data: Filters a ticker's data for the chosen range and returns X/Y series.
-  - get_stat_value: Computes stats over the filtered Close prices and returns overlay lines.
-
-Conventions:
-  - Python → JS calls are made with jsc.eval_js_code("window.fnName(...)").
-  - JS → Python calls use call_py('handler_name', ...).
-  - Only Std Dev returns a per-stat error ('Only one price point') when n == 1.
+- ready: initialize UI and send default dates/tickers to the page.
+--JS callback: frontend sets given UI and default values.
+- get_plot_data: filter one ticker by date and send x/y arrays.
+--JS callback: frontend plots x/y arrays.
+- get_stat_value: compute mean/median/std and send overlay values.
+--JS callback: frontend plots overlay lines.
 """
+
 
 import os
 import pandas as pd
-import numpy as np
 from datetime import date, timedelta
 from .config import TICKERS, DATA_DIR
 from .data import load_data, filter_by_date
@@ -23,9 +21,17 @@ from .data import load_data, filter_by_date
 def ready(jsc, origin, pathname, search, *args):
     """
     Initialize the frontend by sending available tickers and default dates.
+    The default window is the latest 30 days.
+    
+    Args:
+    jsc: PyLinkJS client for this tab.
+    origin: Page origin string.
+    pathname: Page path.
+    search: Query string.
+    *args: Extra values.
 
-    The default window is the latest 30 days within the union of all available
-    ticker datasets (if any are present).
+    Returns:
+        None
 
     JS callback:
         window.initApp(tickerList: string[], defaultStart: 'YYYY-MM-DD', defaultEnd: 'YYYY-MM-DD')
@@ -34,6 +40,10 @@ def ready(jsc, origin, pathname, search, *args):
 
     default_end = date.today()
     default_start = default_end - timedelta(days=30)
+    
+    # Explicitly set dates to iso format for front end
+    default_start = default_start.isoformat()
+    default_end = default_end.isoformat()
 
     # Dates to strings for the date inputs
     jsc.eval_js_code(
@@ -45,8 +55,17 @@ def get_plot_data(jsc, ticker, start, end):
     """
     Provide X (date strings) and Y (Close prices) for the chart, or an error message.
 
+    Args:
+        jsc: PyLinkJS client.
+        ticker: Ticker symbol (e.g., 'AAPL').
+        start: Start date 'YYYY-MM-DD'.
+        end: End date 'YYYY-MM-DD'.
+    
+    Returns:
+        None
+
     JS callback:
-        window.plotStockData(x: string[], y: (number|null)[], errorMsg: string|null)
+        window.plotStockData(x: string[], y: number[], errorMsg: string|null)
     """
     df = load_data(ticker)
     if df.empty:
@@ -54,12 +73,13 @@ def get_plot_data(jsc, ticker, start, end):
         return
 
     filtered = filter_by_date(df, start, end)
-    if filtered.empty or "Close" not in filtered:
+    if filtered.empty:
         jsc.eval_js_code("window.plotStockData([], [], 'No data for selected range');")
         return
 
+    # return lists to JS to be read as arrays
     x = [pd.to_datetime(d).strftime("%m/%d/%Y") for d in filtered["Date"]]
-    y = [float(c) if pd.notna(c) else None for c in filtered["Close"]]
+    y = [float(c) for c in filtered["Close"]]
     jsc.eval_js_code(f"window.plotStockData({x}, {y}, null);")
 
 
@@ -67,33 +87,30 @@ def get_stat_value(jsc, ticker, start, end, stat):
     """
     Compute a requested statistic and return overlay line(s) for the chart.
 
-    Unified JS contract:
+    Args:
+    jsc: PyLinkJS client.
+    ticker: Ticker symbol (e.g., 'AAPL').
+    start: Start date 'YYYY-MM-DD'.
+    end: End date 'YYYY-MM-DD'.
+    stat: 'mean', 'median', or 'std'.
+
+    Returns:
+        None
+
+    JS callback:
         window.drawStatLine(
             stat: 'mean'|'median'|'std',
             upper: number|null,
             lower: number|null,
             errorMsg: string|null
         )
-
-    Behavior:
-        - mean/median: return (upper=value, lower=null, error=null).
-        - std:
-            * if only one price point exists: (upper=null, lower=null, error='Only one price point')
-            * else return (upper=mean+std, lower=mean-std, error=null)
-        - If no valid numeric prices are available, return nulls (no per-stat errors for mean/median).
     """
     df = load_data(ticker)
-    if df.empty:
-        jsc.eval_js_code(f"window.drawStatLine('{stat}', null, null, null);")
-        return
 
     filtered = filter_by_date(df, start, end)
-    price = pd.to_numeric(filtered.get("Close", pd.Series(dtype=float)), errors="coerce") \
-               .replace([np.inf, -np.inf], np.nan).dropna()
-
-    if price.empty:
-        jsc.eval_js_code(f"window.drawStatLine('{stat}', null, null, null);")
-        return
+    
+    # convert to price series to utilize mean, median, std pandas functions
+    price = pd.to_numeric(filtered.get("Close", pd.Series(dtype=float)), errors="coerce").dropna()
 
     s = stat.lower()
 
@@ -110,14 +127,12 @@ def get_stat_value(jsc, ticker, start, end, stat):
     if s == "std":
         n = len(price)
         if n == 1:
-            jsc.eval_js_code("window.drawStatLine('std', null, null, 'Only one price point');")
+            jsc.eval_js_code("window.drawStatLine('std', null, null, 'Only one price point, two required for std.');")
             return
         mean = price.mean()
-        std = price.std()  # sample std (ddof=1). For population, use price.std(ddof=0).
+        std = price.std()  
         upper = float(mean + std)
         lower = float(mean - std)
         jsc.eval_js_code(f"window.drawStatLine('std', {upper}, {lower}, null);")
         return
 
-    # Unknown stat: silently no-op (could log if desired)
-    jsc.eval_js_code(f"window.drawStatLine('{stat}', null, null, null);")
