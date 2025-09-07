@@ -11,7 +11,6 @@
  */
 
 // Only keep constants where we expect to tweak copy or reuse the value.
-const ERR_INVALID_DATES   = "Please choose valid dates.";
 const ERR_START_AFTER_END = "Start date cannot be after end date.";
 const LABEL_STD_UPPER = "Mean + Std Dev";
 const LABEL_STD_LOWER = "Mean - Std Dev";
