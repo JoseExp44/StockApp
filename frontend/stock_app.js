@@ -2,15 +2,15 @@
 /**
  * Frontend logic for stock web app.
  *
- * Flow:
- *  - Python calls window.initApp(...) on load to seed tickers and default dates.
- *  - User changes inputs -> fetchPlotData() -> ask backend for filtered series.
- *  - Backend calls window.plotStockData(x, y, errorMsg) to render or show an error.
+ * Data Flow:
+ *  - Python calls window.initApp(...) on load to initialize tickers and default dates.
+ *  - User changes inputs -> fetchPlotData() -> ask backend for filtered data.
+ *  - Backend calls window.plotStockData(x, y, errorMsg) to plot or show an error.
  *  - Stat buttons call toggleStatLine(stat). If turned on, JS asks backend for the stat.
  *  - Backend calls window.drawStatLine(stat, upper, lower, errorMsg) to overlay lines.
  */
 
-// Only keep constants where we expect to tweak copy or reuse the value.
+// Only keep constants where we expect to change or reuse the value.
 const ERR_START_AFTER_END = "Start date cannot be after end date.";
 const LABEL_STD_UPPER = "Mean + Std Dev";
 const LABEL_STD_LOWER = "Mean - Std Dev";
@@ -27,18 +27,22 @@ let activeStats = { mean: false, median: false, std: false };
 window.initApp = function(tickerList, defaultStart, defaultEnd) {
   tickers = tickerList;
 
+  // Add ticker values to dropdown
   const tickerSelect = document.getElementById("ticker-select");
   tickerSelect.innerHTML = tickers.map(t => `<option value="${t}">${t}</option>`).join('');
 
+  // Set initial start and end dates
   const startDateInput = document.getElementById("start-date");
   const endDateInput   = document.getElementById("end-date");
   startDateInput.value = defaultStart;
   endDateInput.value   = defaultEnd;
 
+  // Add event listeners to update chart
   tickerSelect.onchange   = fetchPlotData;
   startDateInput.onchange = fetchPlotData;
   endDateInput.onchange   = fetchPlotData;
 
+  // Plot initial chart from default values
   fetchPlotData();
 };
 
@@ -54,7 +58,7 @@ function fetchPlotData() {
 
   const plotErrorDiv = document.getElementById("plot-error");
 
-  // Reset UI for a fresh series
+  // Reset UI 
   plotErrorDiv.textContent = "";
   startDateInput.classList.remove("input-error");
   endDateInput.classList.remove("input-error");
@@ -79,12 +83,12 @@ function fetchPlotData() {
     return;
   }
 
-  // Ask backend for filtered Close series
+  // Ask backend for filtered Close data
   call_py('get_plot_data', ticker, startVal, endVal);
 }
 
 /**
- * Render base series or display an error under the chart.
+ * Plot base chart or display an error under the chart.
  * Called by Python: window.plotStockData(x, y, errorMsg).
  */
 window.plotStockData = function(x, y, errorMsg) {
