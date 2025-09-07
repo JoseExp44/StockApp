@@ -17,7 +17,7 @@ const LABEL_STD_LOWER = "Mean - Std Dev";
 
 // Module state kept simple for readability
 let tickers = [], chart = null;
-let plotX = [], plotY = [];
+let plotX = [];
 let activeStats = { mean: false, median: false, std: false };
 
 /**
@@ -47,7 +47,7 @@ window.initApp = function(tickerList, defaultStart, defaultEnd) {
 };
 
 /**
- * Read inputs, perform light validation, reset stat state, and request series from backend.
+ * Read inputs, perform light validation, reset state, and request data from backend.
  */
 function fetchPlotData() {
   const ticker         = document.getElementById("ticker-select").value;
@@ -97,12 +97,13 @@ window.plotStockData = function(x, y, errorMsg) {
   if (errorMsg) {
     plotErrorDiv.textContent = errorMsg;
     if (chart) { chart.destroy(); chart = null; }
-    plotX = []; plotY = [];
+    plotX = []; 
     return;
   }
 
   plotErrorDiv.textContent = "";
-  plotX = x; plotY = y;
+  // get points necessary to plot over-lay lines (X -> size)
+  plotX = x; 
 
   const ctx = document.getElementById("stock-chart").getContext('2d');
 
@@ -114,17 +115,17 @@ window.plotStockData = function(x, y, errorMsg) {
         label: "Close Price ($)",
         data: y,
         borderColor: "blue",
-        fill: false,
-        pointRadius: 1.5,
-        hidden: false
+        pointRadius: 1.5
       }]
     },
     options: {
       responsive: false,
-      plugins: { legend: { onClick: () => {} } },
       scales: {
+             // presents a fluid line (no breaks due to skipped dates)
         x: { type: 'category', title: { display: true, text: 'Date' },
+             // avoids clutter due to excessive ticks
              ticks: { autoSkip: true, maxTicksLimit: 12 } },
+             // stock traders usually care for the relative high and lows
         y: { title: { display: true, text: 'Price ($)' }, beginAtZero: false }
       }
     }
@@ -144,21 +145,26 @@ function getStatDatasetIndex(label) {
  * If turning ON, ask backend for the stat; if turning OFF, remove the overlay dataset(s).
  */
 function toggleStatLine(stat) {
+  // toggle button
   activeStats[stat] = !activeStats[stat];
   document.getElementById(`${stat}-btn`)
     .classList.toggle("active", activeStats[stat]);
 
+  // reset stat-error
   const statErrorDiv = document.getElementById(`${stat}-error`);
   if (statErrorDiv) statErrorDiv.textContent = "";
 
+  // get state 
   const ticker         = document.getElementById("ticker-select").value;
   const startDateInput = document.getElementById("start-date");
   const endDateInput   = document.getElementById("end-date");
   const startVal       = startDateInput.value;
   const endVal         = endDateInput.value;
 
+  // get stat value for overlay if toggled on
   if (activeStats[stat]) {
     call_py('get_stat_value', ticker, startVal, endVal, stat);
+  // remove overlay if toggled off
   } else {
     if (!chart) return;
 
@@ -180,16 +186,19 @@ function toggleStatLine(stat) {
     chart.update();
   }
 }
+
+// expose to HTML
 window.toggleStatLine = toggleStatLine;
 
 /**
  * Draw or remove stat overlays based on backend response.
- * Only Std Dev can return a specific per‑stat error ('Only one price point').
+ * Only Std Dev can return a specific error ('Only one price point, two required for std dev.').
  */
 window.drawStatLine = function(stat, upper, lower, errorMsg) {
   if (errorMsg) {
     const statErrorDiv = document.getElementById(`${stat}-error`);
     if (statErrorDiv) statErrorDiv.textContent = errorMsg;
+    // toggle button off 
     if (activeStats[stat]) {
       activeStats[stat] = false;
       document.getElementById(`${stat}-btn`).classList.remove("active");
@@ -197,11 +206,14 @@ window.drawStatLine = function(stat, upper, lower, errorMsg) {
     return;
   }
 
+  // doesn't exist due to frontend error 
   if (!chart) return;
 
   if (stat === "mean") {
+    // if overlay exists remove
     const i = getStatDatasetIndex("Mean");
     if (i > -1) chart.data.datasets.splice(i, 1);
+    // add overlay line
     chart.data.datasets.push({
       label: "Mean",
       data: plotX.map(() => upper),

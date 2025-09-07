@@ -109,7 +109,7 @@ def get_stat_value(jsc, ticker, start, end, stat):
 
     filtered = filter_by_date(df, start, end)
     
-    # convert to price series to utilize mean, median, std pandas functions
+    # convert to price series to utilize mean, median, std dev pandas functions
     price = pd.to_numeric(filtered.get("Close", pd.Series(dtype=float)), errors="coerce").dropna()
 
     s = stat.lower()
@@ -127,7 +127,7 @@ def get_stat_value(jsc, ticker, start, end, stat):
     if s == "std":
         n = len(price)
         if n == 1:
-            jsc.eval_js_code("window.drawStatLine('std', null, null, 'Only one price point, two required for std.');")
+            jsc.eval_js_code("window.drawStatLine('std', null, null, 'Only one price point, two required for std dev.');")
             return
         mean = price.mean()
         std = price.std()  
