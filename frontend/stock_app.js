@@ -41,6 +41,11 @@ window.initApp = function(tickerList, defaultStart, defaultEnd) {
   tickerSelect.onchange   = fetchPlotData;
   startDateInput.onchange = fetchPlotData;
   endDateInput.onchange   = fetchPlotData;
+  
+  // Add event listeners to plot overlay lines
+  document.getElementById("mean-btn").onclick   = () => toggleStatLine("mean");
+  document.getElementById("median-btn").onclick = () => toggleStatLine("median");
+  document.getElementById("std-btn").onclick    = () => toggleStatLine("std");
 
   // Plot initial chart from default values
   fetchPlotData();
@@ -145,6 +150,9 @@ function getStatDatasetIndex(label) {
  * If turning ON, ask backend for the stat; if turning OFF, remove the overlay dataset(s).
  */
 function toggleStatLine(stat) {
+  // no chart - reset button
+  
+  
   // toggle button
   activeStats[stat] = !activeStats[stat];
   document.getElementById(`${stat}-btn`)
@@ -188,7 +196,7 @@ function toggleStatLine(stat) {
 }
 
 // expose to HTML
-window.toggleStatLine = toggleStatLine;
+// window.toggleStatLine = toggleStatLine;
 
 /**
  * Draw or remove stat overlays based on backend response.
