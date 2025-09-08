@@ -195,9 +195,6 @@ function toggleStatLine(stat) {
   }
 }
 
-// expose to HTML
-// window.toggleStatLine = toggleStatLine;
-
 /**
  * Draw or remove stat overlays based on backend response.
  * Only Std Dev can return a specific error ('Only one price point, two required for std dev.').
@@ -260,7 +257,7 @@ window.drawStatLine = function(stat, upper, lower, errorMsg) {
       {
         label: LABEL_STD_UPPER,
         // returns array of upper with the length of X -> [upper, upper,...]
-      // plotted as y axis data 
+        // plotted as y axis data 
         data: plotX.map(() => upper),
         borderColor: "orange",
         borderWidth: 2,
@@ -271,7 +268,7 @@ window.drawStatLine = function(stat, upper, lower, errorMsg) {
       {
         label: LABEL_STD_LOWER,
         // returns array of upper with the length of X -> [upper, upper,...]
-      // plotted as y axis data 
+        // plotted as y axis data 
         data: plotX.map(() => lower),
         borderColor: "red",
         borderWidth: 2,
