@@ -172,7 +172,7 @@ function toggleStatLine(stat) {
   // get stat value for overlay if toggled on
   if (activeStats[stat]) {
     call_py('get_stat_value', ticker, startVal, endVal, stat);
-  // remove overlay if toggled off
+  // remove overlay (splice) if toggled off
   } else {
     if (!chart) return;
 
@@ -201,6 +201,7 @@ function toggleStatLine(stat) {
 /**
  * Draw or remove stat overlays based on backend response.
  * Only Std Dev can return a specific error ('Only one price point, two required for std dev.').
+ * General logic: if overlay exists remove (splice), then add new overlay
  */
 window.drawStatLine = function(stat, upper, lower, errorMsg) {
   if (errorMsg) {
@@ -218,19 +219,18 @@ window.drawStatLine = function(stat, upper, lower, errorMsg) {
   if (!chart) return;
 
   if (stat === "mean") {
-    // if overlay exists remove
     const i = getStatDatasetIndex("Mean");
     if (i > -1) chart.data.datasets.splice(i, 1);
-    // add overlay line
     chart.data.datasets.push({
       label: "Mean",
+      // returns array of upper with the length of X -> [upper, upper,...]
+      // plotted as y axis data 
       data: plotX.map(() => upper),
       borderColor: "green",
       borderWidth: 2,
       fill: false,
       borderDash: [7, 5],
-      pointRadius: 0,
-      spanGaps: true
+      pointRadius: 0
     });
   }
 
@@ -239,13 +239,14 @@ window.drawStatLine = function(stat, upper, lower, errorMsg) {
     if (i > -1) chart.data.datasets.splice(i, 1);
     chart.data.datasets.push({
       label: "Median",
+      // returns array of upper with the length of X -> [upper, upper,...]
+      // plotted as y axis data 
       data: plotX.map(() => upper),
       borderColor: "purple",
       borderWidth: 2,
       fill: false,
       borderDash: [7, 5],
-      pointRadius: 0,
-      spanGaps: true
+      pointRadius: 0
     });
   }
 
@@ -258,23 +259,25 @@ window.drawStatLine = function(stat, upper, lower, errorMsg) {
     chart.data.datasets.push(
       {
         label: LABEL_STD_UPPER,
+        // returns array of upper with the length of X -> [upper, upper,...]
+      // plotted as y axis data 
         data: plotX.map(() => upper),
         borderColor: "orange",
         borderWidth: 2,
         fill: false,
         borderDash: [6, 4],
-        pointRadius: 0,
-        spanGaps: true
+        pointRadius: 0
       },
       {
         label: LABEL_STD_LOWER,
+        // returns array of upper with the length of X -> [upper, upper,...]
+      // plotted as y axis data 
         data: plotX.map(() => lower),
         borderColor: "red",
         borderWidth: 2,
         fill: false,
         borderDash: [6, 4],
-        pointRadius: 0,
-        spanGaps: true
+        pointRadius: 0
       }
     );
   }

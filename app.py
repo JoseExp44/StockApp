@@ -3,7 +3,7 @@ Entry point.
 
 - Downloads/caches data for a small ticker list.
 - Registers PyLinkJS handlers that the frontend will call.
-- Starts a simple web server that serves the frontend and routes JS↔Python.
+- Starts a simple web server that serves the frontend and injects PyLinkJS.
 """
 
 from backend.config import SERVER_PORT
@@ -13,7 +13,7 @@ from pylinkjs import PyLinkJS
 
 
 def main():
-    """Bootstrap the app: fetch data, register handlers, start the server."""
+    """start the app: fetch data, register handlers, start the server."""
     print("Downloading stock data for all tickers...")
     download_data()
     print("Download complete.")
